@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs-extra');
 const path = require('path');
 const { logAction } = require('../helpers/audit.helper');
+const { uploadFileToSpaces } = require('../helpers/spaces-helper'); // <-- 1. IMPORTA LA NUEVA FUNCIÓN
 
 const getUsers = async (req, res) => {
     const { search = '' } = req.query;
@@ -89,7 +90,7 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
     const { id } = req.params;
-    const { uid } = req; 
+    const { uid } = req;
     if (uid === parseInt(id)) {
         return res.status(400).json({ msg: 'Acción no permitida: No puedes desactivarte a ti mismo.' });
     }
@@ -140,27 +141,25 @@ const updatePassword = async (req, res) => {
     }
 };
 
+// --- 2. FUNCIÓN MODIFICADA ---
 const uploadProfilePhoto = async (req, res) => {
     const { uid } = req;
     try {
         if (!req.file) {
             return res.status(400).json({ msg: 'No se ha subido ningún archivo.' });
         }
+
+        // Ya no necesitas borrar el archivo antiguo del servidor local.
+        // Si quisieras borrar el antiguo de Spaces, sería una lógica adicional aquí.
+
+        // Sube el nuevo archivo a Spaces y obtén la URL pública
+        const newPhotoUrl = await uploadFileToSpaces(req.file, 'profiles');
         
-        const [[user]] = await pool.query('SELECT profile_picture_url FROM users WHERE id = ?', [uid]);
-        if (user && user.profile_picture_url) {
-            // La ruta correcta para encontrar el archivo a borrar desde la carpeta /controllers
-            const oldImagePath = path.join(__dirname, '../public', user.profile_picture_url);
-            if (await fs.pathExists(oldImagePath)) {
-                await fs.unlink(oldImagePath);
-                console.log(`Imagen antigua eliminada: ${oldImagePath}`);
-            }
-        }
-        
-        const newPhotoUrl = `/uploads/profiles/${req.file.filename}`;
+        // Actualiza la base de datos con la nueva URL
         await pool.query('UPDATE users SET profile_picture_url = ? WHERE id = ?', [newPhotoUrl, uid]);
         
         await logAction(uid, 'Actualizó su foto de perfil.');
+        
         res.json({
             msg: 'Foto de perfil actualizada exitosamente.',
             profilePictureUrl: newPhotoUrl,
