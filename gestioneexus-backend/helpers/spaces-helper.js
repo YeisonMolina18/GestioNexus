@@ -38,6 +38,7 @@ const uploadFileToSpaces = async (file, folder) => {
         fs.unlinkSync(file.path);
 
         // Retorna la URL pública del archivo
+        // Esta es la línea correcta
         const fileUrl = `https://${process.env.SPACES_BUCKET}.${process.env.SPACES_ENDPOINT}/${fileName}`;
         return fileUrl;
 
