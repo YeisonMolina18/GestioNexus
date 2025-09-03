@@ -6,7 +6,6 @@ import ChangePasswordModal from '../components/ChangePasswordModal';
 import Swal from 'sweetalert2';
 
 const ProfilePage = () => {
-    // El contexto nos da el usuario actual y la función para actualizarlo.
     const { user, setUser } = useContext(AuthContext); 
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const fileInputRef = useRef(null);
@@ -22,22 +21,17 @@ const ProfilePage = () => {
         if (!file) return;
 
         const formData = new FormData();
-        // El backend espera el archivo con el nombre 'profile_photo'
         formData.append('profile_photo', file); 
 
         try {
             Swal.fire({ title: 'Subiendo imagen...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
             
-            // 1. Llama a la API y guarda la respuesta
             const { data } = await api.post('/users/upload-photo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            // 2. Extrae la nueva URL de la respuesta
             const newPhotoUrl = data.profilePictureUrl;
 
-            // 3. Usa la función del contexto para actualizar el usuario
-            //    manteniendo los datos antiguos y actualizando solo la foto.
             setUser(currentUser => ({
                 ...currentUser,
                 profile_picture_url: newPhotoUrl
@@ -59,9 +53,7 @@ const ProfilePage = () => {
                     <div className="flex-shrink-0 text-center">
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
                         
-                        {/* --- CORRECCIÓN 2: Usar la URL directamente --- */}
                         {user.profile_picture_url ? (
-                            // La URL de Spaces es absoluta, no necesita 'backendUrl'
                             <img src={user.profile_picture_url} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
                         ) : (
                             <div className="w-32 h-32 bg-[#5D1227] rounded-full flex items-center justify-center text-white text-5xl font-bold mx-auto shadow-md">
