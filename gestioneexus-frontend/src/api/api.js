@@ -1,9 +1,13 @@
 // src/api/api.js
 import axios from 'axios';
 
+// Lee la URL base de las variables de entorno de Vite.
+// Si no existe, usa la URL local para desarrollo.
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
 // Crea una instancia de Axios con la URL base del backend
 const api = axios.create({
-    baseURL: 'http://localhost:4000/api' // La URL de tu backend
+    baseURL: baseURL 
 });
 
 // Interceptor para añadir el token JWT a todas las peticiones

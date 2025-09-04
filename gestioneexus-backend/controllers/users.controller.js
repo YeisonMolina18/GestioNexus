@@ -1,13 +1,14 @@
 const pool = require('../db/database');
 const bcrypt = require('bcryptjs');
 const { logAction } = require('../helpers/audit.helper');
+const { uploadFileToSpaces } = require('../helpers/spaces-helper');
 
 const getUsers = async (req, res) => {
     const { search = '' } = req.query;
     try {
         const searchTerm = `%${search}%`;
         const [rows] = await pool.query(
-            `SELECT u.id, u.full_name, u.username, u.email, u.is_active, r.name as role 
+            `SELECT u.id, u.full_name, u.username, u.email, u.is_active, u.profile_picture_url, r.name as role 
              FROM users u 
              JOIN roles r ON u.role_id = r.id
              WHERE u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ?`,
@@ -21,6 +22,7 @@ const getUsers = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
+    const { uid } = req;
     const { full_name, username, email, password, role_id } = req.body;
     try {
         const salt = bcrypt.genSaltSync();
@@ -29,8 +31,8 @@ const createUser = async (req, res) => {
             'INSERT INTO users (full_name, username, email, password, role_id) VALUES (?, ?, ?, ?, ?)',
             [full_name, username, email, hashedPassword, role_id]
         );
-        const [newUserRows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [result.insertId]);
-        await logAction(req.uid, `Creó el usuario '${full_name}' (ID: ${result.insertId})`);
+        const [newUserRows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, u.profile_picture_url, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [result.insertId]);
+        await logAction(uid, `Creó el usuario '${full_name}' (ID: ${result.insertId})`);
         res.status(201).json(newUserRows[0]);
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -60,13 +62,22 @@ const updateUser = async (req, res) => {
                 );
             }
         } else {
-            const { full_name, username, email, role_id } = req.body;
-            await pool.query(
-                'UPDATE users SET full_name = ?, username = ?, email = ?, role_id = ? WHERE id = ?',
-                [full_name, username, email, role_id, id]
-            );
+            const { full_name, username, email, role_id, password } = req.body;
+            if (password && password.trim().length > 0) {
+                const salt = bcrypt.genSaltSync();
+                const hashedPassword = bcrypt.hashSync(password.trim(), salt);
+                await pool.query(
+                    'UPDATE users SET full_name = ?, username = ?, email = ?, role_id = ?, password = ? WHERE id = ?',
+                    [full_name, username, email, role_id, hashedPassword, id]
+                );
+            } else {
+                await pool.query(
+                    'UPDATE users SET full_name = ?, username = ?, email = ?, role_id = ? WHERE id = ?',
+                    [full_name, username, email, role_id, id]
+                );
+            }
         }
-        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
+        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, u.profile_picture_url, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
         await logAction(req.uid, `Actualizó al usuario con ID: ${id}`);
         res.json(rows[0]);
     } catch (error) {
@@ -77,13 +88,13 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
     const { id } = req.params;
-    const { uid } = req; 
+    const { uid } = req;
     if (uid === parseInt(id)) {
         return res.status(400).json({ msg: 'Acción no permitida: No puedes desactivarte a ti mismo.' });
     }
     try {
         await pool.query('UPDATE users SET is_active = FALSE WHERE id = ?', [id]);
-        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
+        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, u.profile_picture_url, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
         await logAction(uid, `Desactivó al usuario con ID: ${id}`);
         res.json(rows[0]);
     } catch (error) {
@@ -93,10 +104,11 @@ const deleteUser = async (req, res) => {
 
 const activateUser = async (req, res) => {
     const { id } = req.params;
+    const { uid } = req;
     try {
         await pool.query('UPDATE users SET is_active = TRUE WHERE id = ?', [id]);
-        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
-        await logAction(req.uid, `Activó al usuario con ID: ${id}`);
+        const [rows] = await pool.query('SELECT u.id, u.full_name, u.username, u.email, u.is_active, u.profile_picture_url, r.name as role FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', [id]);
+        await logAction(uid, `Activó al usuario con ID: ${id}`);
         res.json(rows[0]);
     } catch (error) {
         res.status(500).json({ msg: 'Error al activar el usuario' });
@@ -112,7 +124,7 @@ const updatePassword = async (req, res) => {
         if (!user) {
             return res.status(404).json({ msg: 'Usuario no encontrado.' });
         }
-        const isPasswordCorrect = bcrypt.compareSync(oldPassword, user.password);
+        const isPasswordCorrect = bcrypt.compareSync(oldPassword.trim(), user.password.trim());
         if (!isPasswordCorrect) {
             return res.status(400).json({ msg: 'La contraseña actual es incorrecta.' });
         }
@@ -127,11 +139,35 @@ const updatePassword = async (req, res) => {
     }
 };
 
+const uploadProfilePhoto = async (req, res) => {
+    const { uid } = req;
+    try {
+        if (!req.file) {
+            return res.status(400).json({ msg: 'No se ha subido ningún archivo.' });
+        }
+
+        const newPhotoUrl = await uploadFileToSpaces(req.file, 'profiles');
+        
+        await pool.query('UPDATE users SET profile_picture_url = ? WHERE id = ?', [newPhotoUrl, uid]);
+        
+        await logAction(uid, 'Actualizó su foto de perfil.');
+        
+        res.json({
+            msg: 'Foto de perfil actualizada exitosamente.',
+            profilePictureUrl: newPhotoUrl,
+        });
+    } catch (error) {
+        console.error("Error al subir la foto:", error);
+        res.status(500).json({ msg: 'Error al subir la foto de perfil' });
+    }
+};
+
 module.exports = {
     getUsers,
     createUser,
     updateUser,
     deleteUser,
     activateUser,
-    updatePassword
+    updatePassword,
+    uploadProfilePhoto
 };
