@@ -1,3 +1,5 @@
+// gestioneexus-frontend/src/context/AuthContext.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../api/api';
 import Swal from 'sweetalert2';
@@ -31,10 +33,9 @@ export const AuthProvider = ({ children }) => {
                 // Estandarizamos el objeto de usuario
                 setUser({
                     id: data.user.id,
-                    name: data.user.name, // Mantenemos 'name' por si se usa en otro lado
-                    fullName: data.user.fullName,
+                    full_name: data.user.full_name, // Usamos full_name consistentemente
                     role: data.user.role,
-                    profilePictureUrl: data.user.profilePictureUrl
+                    profile_picture_url: data.user.profile_picture_url
                 });
                 checkNotificationStatus(); 
             } catch (error) {
@@ -51,14 +52,12 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('token', data.token);
-            // --- CORRECCIÓN AQUÍ: Estandarizamos el objeto de usuario ---
-            // Aseguramos que las propiedades 'name' y 'fullName' existan siempre.
+            // Estandarizamos el objeto de usuario al iniciar sesión
             setUser({
                 id: data.user.id,
-                name: data.user.fullName, // Asignamos fullName a name
-                fullName: data.user.fullName,
+                full_name: data.user.full_name,
                 role: data.user.role,
-                profilePictureUrl: data.user.profilePictureUrl
+                profile_picture_url: data.user.profile_picture_url
             });
             checkNotificationStatus();
             return true;
@@ -85,7 +84,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{ 
             user, 
-            setUser: updateUserContext, 
+            setUser: updateUserContext, // Exportamos la función correcta
             login, 
             logout, 
             loading, 

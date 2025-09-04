@@ -1,3 +1,5 @@
+// gestioneexus-frontend/src/pages/ProfilePage.jsx
+
 import React, { useContext, useState, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/api';
@@ -26,20 +28,15 @@ const ProfilePage = () => {
         try {
             Swal.fire({ title: 'Subiendo imagen...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
             
-            // 1. Llama a la API y guarda la respuesta
             const { data } = await api.post('/users/upload-photo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
-            // 2. Extrae la nueva URL de la respuesta
+            
+            // Usamos el nombre de variable que el backend nos envía
             const newPhotoUrl = data.profilePictureUrl;
 
-            // 3. ACTUALIZA EL ESTADO del usuario con la nueva URL
-            //    manteniendo los datos antiguos y actualizando solo la foto.
-            setUser(currentUser => ({
-                ...currentUser,
-                profile_picture_url: newPhotoUrl
-            }));
+            // Actualizamos el estado del usuario en el contexto
+            setUser({ profile_picture_url: newPhotoUrl });
 
             Swal.fire('¡Éxito!', data.msg, 'success');
 
@@ -58,7 +55,6 @@ const ProfilePage = () => {
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
                         
                         {user.profile_picture_url ? (
-                            // La URL de Spaces es absoluta, no necesita unirse a otra URL
                             <img src={user.profile_picture_url} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
                         ) : (
                             <div className="w-32 h-32 bg-[#5D1227] rounded-full flex items-center justify-center text-white text-5xl font-bold mx-auto shadow-md">
