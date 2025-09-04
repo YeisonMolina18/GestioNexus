@@ -3,7 +3,6 @@ import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import NotificationDropdown from './NotificationDropdown';
 import Swal from 'sweetalert2';
-import api from '../api/api';
 
 const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) => {
     const { user, logout, hasUnreadNotifications, markNotificationsAsRead } = useContext(AuthContext);
@@ -15,7 +14,6 @@ const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) 
     
     const notifRef = useRef(null);
     const profileRef = useRef(null);
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
     const handleNotificationClick = () => {
         setNotifOpen(!notifOpen);
@@ -42,6 +40,11 @@ const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) 
         }).then((result) => { if (result.isConfirmed) { logout(); navigate('/login'); } });
     };
 
+    // Añadimos una comprobación para no renderizar nada si el usuario no ha cargado
+    if (!user) {
+        return null;
+    }
+
     return (
         <header className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -51,7 +54,8 @@ const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) 
                 <div>
                     {location.pathname === '/dashboard' && (
                         <>
-                            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Bienvenido de nuevo, {user?.name ? user.name.split(' ')[0] : ''}!</h1>
+                            {/* --- CORRECCIÓN 1: Usar user.full_name --- */}
+                            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Bienvenido de nuevo, {user.full_name ? user.full_name.split(' ')[0] : ''}!</h1>
                             <p className="text-gray-500 text-sm md:text-base">Aquí tienes el resumen de tu negocio.</p>
                         </>
                     )}
@@ -60,12 +64,12 @@ const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) 
 
             <div className="flex items-center gap-2 md:gap-6">
                  {showGlobalSearch && (
-                    <div className="relative">
-                        <input type="text" placeholder="Buscar..." className="hidden sm:block w-48 md:w-64 pl-10 pr-4 py-2 border rounded-full bg-white focus:outline-none focus:ring-2 focus:ring-[#5D1227]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hidden sm:block">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                        </span>
-                    </div>
+                     <div className="relative">
+                         <input type="text" placeholder="Buscar..." className="hidden sm:block w-48 md:w-64 pl-10 pr-4 py-2 border rounded-full bg-white focus:outline-none focus:ring-2 focus:ring-[#5D1227]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hidden sm:block">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                         </span>
+                     </div>
                  )}
                 
                 <div className="relative" ref={notifRef}>
@@ -78,15 +82,17 @@ const Header = ({ searchTerm, setSearchTerm, toggleSidebar, showGlobalSearch }) 
                             </span>
                         )}
                     </button>
-                    {/* --- CORRECCIÓN AQUÍ: Pasamos la función para limpiar --- */}
                     <NotificationDropdown isOpen={notifOpen} onClear={markNotificationsAsRead} />
                 </div>
 
                 <div className="relative" ref={profileRef}>
                     <button onClick={() => setProfileOpen(!profileOpen)} className="w-10 h-10 bg-[#5D1227] rounded-full flex items-center justify-center text-white font-bold cursor-pointer overflow-hidden">
-                        {user?.profilePictureUrl ? (
-                            <img src={`${backendUrl}${user.profilePictureUrl}`} alt="Perfil" className="w-full h-full object-cover" />
-                        ) : ( user?.name ? user.name.charAt(0).toUpperCase() : '' )}
+                        {/* --- CORRECCIÓN 2 y 3: Usar variables correctas y URL directa --- */}
+                        {user.profile_picture_url ? (
+                            <img src={user.profile_picture_url} alt="Perfil" className="w-full h-full object-cover" />
+                        ) : ( 
+                            user.full_name ? user.full_name.charAt(0).toUpperCase() : '?' 
+                        )}
                     </button>
                     {profileOpen && (
                         <div className="absolute top-14 right-0 w-48 bg-white rounded-lg shadow-xl border z-50 py-1">
