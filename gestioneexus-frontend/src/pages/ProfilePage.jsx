@@ -1,5 +1,3 @@
-// gestioneexus-frontend/src/pages/ProfilePage.jsx
-
 import React, { useContext, useState, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/api';
@@ -28,15 +26,20 @@ const ProfilePage = () => {
         try {
             Swal.fire({ title: 'Subiendo imagen...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
             
+            // 1. Llama a la API y guarda la respuesta
             const { data } = await api.post('/users/upload-photo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            
-            // Usamos el nombre de variable que el backend nos envía
+
+            // 2. Extrae la nueva URL de la respuesta
             const newPhotoUrl = data.profilePictureUrl;
 
-            // Actualizamos el estado del usuario en el contexto
-            setUser({ profile_picture_url: newPhotoUrl });
+            // 3. ACTUALIZA EL ESTADO del usuario con la nueva URL
+            //    manteniendo los datos antiguos y actualizando solo la foto.
+            setUser(currentUser => ({
+                ...currentUser,
+                profile_picture_url: newPhotoUrl
+            }));
 
             Swal.fire('¡Éxito!', data.msg, 'success');
 
