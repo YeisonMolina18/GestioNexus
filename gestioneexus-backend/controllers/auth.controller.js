@@ -7,7 +7,6 @@ const { logAction } = require('../helpers/audit.helper');
 
 const login = async (req, res) => {
     const { email, password } = req.body;
-
     try {
         const [rows] = await pool.query('SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.email = ?', [email]);
         const user = rows[0];
@@ -18,6 +17,7 @@ const login = async (req, res) => {
         const validPassword = bcrypt.compareSync(password.trim(), user.password.trim());
         if (!validPassword) { return res.status(400).json({ msg: 'Usuario o contraseña incorrectos' }); }
 
+        // Generamos el token con toda la información necesaria
         const token = await generateJWT(user.id, user.full_name, user.role_name);
         await logAction(user.id, 'Inició sesión.');
         
@@ -39,15 +39,10 @@ const login = async (req, res) => {
     }
 };
 
-// --- FUNCIÓN CORREGIDA ---
 const renewToken = async (req, res) => {
-    const { uid } = req; // Obtenemos el ID del usuario del token ya validado
-
+    const { uid } = req; // Obtenemos el ID del token actual
     try {
-        // 1. Genera un nuevo token JWT
-        const token = await generateJWT(uid);
-
-        // 2. Busca la información MÁS ACTUALIZADA del usuario en la base de datos
+        // Buscamos la información más reciente del usuario, incluyendo su rol
         const [rows] = await pool.query(
             `SELECT u.id, u.full_name, u.username, u.email, u.profile_picture_url, r.name as role 
              FROM users u 
@@ -62,7 +57,10 @@ const renewToken = async (req, res) => {
         
         const user = rows[0];
 
-        // 3. Devuelve el nuevo token y los DATOS COMPLETOS y actualizados del usuario
+        // Generamos un nuevo token COMPLETO con la información actualizada
+        const token = await generateJWT(user.id, user.full_name, user.role);
+
+        // Devolvemos el nuevo token y los datos completos
         res.json({
             ok: true,
             token,
@@ -82,7 +80,6 @@ const renewToken = async (req, res) => {
     }
 };
 
-
 const forgotPassword = async (req, res) => {
     const { email } = req.body;
     try {
@@ -92,7 +89,7 @@ const forgotPassword = async (req, res) => {
             return res.json({ msg: 'Si existe una cuenta activa con este correo, se ha enviado un enlace de recuperación.' });
         }
         const token = crypto.randomBytes(20).toString('hex');
-        const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+        const expires = new Date(Date.now() + 15 * 60 * 1000);
         await pool.query(
             'UPDATE users SET reset_password_token = ?, reset_password_expires = ? WHERE id = ?',
             [token, expires, user.id]
