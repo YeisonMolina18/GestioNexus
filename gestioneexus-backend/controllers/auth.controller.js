@@ -1,87 +1,133 @@
-// gestioneexus-frontend/src/context/AuthContext.jsx
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const pool = require('../db/database');
+const { generateJWT } = require('../helpers/jwt.helper');
+const { sendPasswordResetEmail } = require('../helpers/email.helper');
+const { logAction } = require('../helpers/audit.helper');
 
-import React, { createContext, useState, useEffect } from 'react';
-import api from '../api/api';
-import Swal from 'sweetalert2';
+const login = async (req, res) => {
+    const { email, password } = req.body;
 
-export const AuthContext = createContext();
+    try {
+        const [rows] = await pool.query('SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.email = ?', [email]);
+        const user = rows[0];
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+        if (!user) { return res.status(400).json({ msg: 'Usuario o contraseña incorrectos' }); }
+        if (!user.is_active) { return res.status(400).json({ msg: 'El usuario está desactivado' }); }
+        
+        const validPassword = bcrypt.compareSync(password.trim(), user.password.trim());
+        if (!validPassword) { return res.status(400).json({ msg: 'Usuario o contraseña incorrectos' }); }
 
-    const checkNotificationStatus = async () => {
-        try {
-            const { data } = await api.get('/notifications/status');
-            setHasUnreadNotifications(data.hasUnread);
-        } catch (error) {
-            console.error("Error checking notification status:", error);
+        const token = await generateJWT(user.id, user.full_name, user.role_name);
+        await logAction(user.id, 'Inició sesión.');
+        
+        res.json({
+            ok: true,
+            user: {
+                id: user.id,
+                full_name: user.full_name,
+                username: user.username,
+                email: user.email,
+                role: user.role_name,
+                profile_picture_url: user.profile_picture_url
+            },
+            token
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ msg: 'Error interno del servidor' });
+    }
+};
+
+// --- FUNCIÓN CORREGIDA ---
+const renewToken = async (req, res) => {
+    const { uid } = req; // Obtenemos el ID del usuario del token ya validado
+
+    try {
+        // 1. Genera un nuevo token JWT
+        const token = await generateJWT(uid);
+
+        // 2. Busca la información MÁS ACTUALIZADA del usuario en la base de datos
+        const [rows] = await pool.query(
+            `SELECT u.id, u.full_name, u.username, u.email, u.profile_picture_url, r.name as role 
+             FROM users u 
+             JOIN roles r ON u.role_id = r.id 
+             WHERE u.id = ?`, 
+            [uid]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ ok: false, msg: 'Usuario no encontrado.' });
         }
-    };
+        
+        const user = rows[0];
 
-    const updateUserContext = (newUserData) => {
-        setUser(prevUser => ({ ...prevUser, ...newUserData }));
-    };
-
-    useEffect(() => {
-        const checkAuthStatus = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setLoading(false);
-                return;
+        // 3. Devuelve el nuevo token y los DATOS COMPLETOS y actualizados del usuario
+        res.json({
+            ok: true,
+            token,
+            user: {
+                id: user.id,
+                full_name: user.full_name,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                profile_picture_url: user.profile_picture_url
             }
-            try {
-                const { data } = await api.get('/auth/renew');
-                localStorage.setItem('token', data.token);
-                setUser(data.user); // El backend ya envía el objeto de usuario correcto
-                checkNotificationStatus(); 
-            } catch (error) {
-                localStorage.removeItem('token');
-                setUser(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-        checkAuthStatus();
-    }, []);
+        });
 
-    const login = async (email, password) => {
-        try {
-            const { data } = await api.post('/auth/login', { email, password });
-            localStorage.setItem('token', data.token);
-            setUser(data.user); // El backend ya envía el objeto de usuario correcto
-            checkNotificationStatus();
-            return true;
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Error en el inicio de sesión', text: error.response?.data?.msg || 'Credenciales incorrectas.' });
-            return false;
+    } catch (error) {
+        console.error("Error al renovar token:", error);
+        res.status(500).json({ ok: false, msg: 'Error al renovar el token' });
+    }
+};
+
+
+const forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND is_active = TRUE', [email]);
+        const user = rows[0];
+        if (!user) {
+            return res.json({ msg: 'Si existe una cuenta activa con este correo, se ha enviado un enlace de recuperación.' });
         }
-    };
+        const token = crypto.randomBytes(20).toString('hex');
+        const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+        await pool.query(
+            'UPDATE users SET reset_password_token = ?, reset_password_expires = ? WHERE id = ?',
+            [token, expires, user.id]
+        );
+        await sendPasswordResetEmail(user.email, token);
+        res.json({ msg: 'Si existe una cuenta activa con este correo, se ha enviado un enlace de recuperación.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: 'Error interno del servidor' });
+    }
+};
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
-    };
+const resetPassword = async (req, res) => {
+    const { token } = req.params;
+    const { password } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE reset_password_token = ? AND reset_password_expires > NOW()', [token]);
+        const user = rows[0];
+        if (!user) {
+            return res.status(400).json({ msg: 'El token de recuperación es inválido o ha expirado.' });
+        }
+        const salt = bcrypt.genSaltSync();
+        const hashedPassword = bcrypt.hashSync(password, salt);
+        await pool.query('UPDATE users SET password = ?, reset_password_token = NULL, reset_password_expires = NULL WHERE id = ?', [hashedPassword, user.id]);
+        await logAction(user.id, `Restableció su contraseña mediante recuperación.`);
+        res.json({ msg: 'Tu contraseña ha sido actualizada exitosamente.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: 'Error al restablecer la contraseña' });
+    }
+};
 
-    const markNotificationsAsRead = () => {
-        setHasUnreadNotifications(false);
-        api.post('/notifications/mark-as-read').catch(err => console.error(err));
-    };
-
-    return (
-        <AuthContext.Provider value={{ 
-            user, 
-            setUser: updateUserContext, 
-            login, 
-            logout, 
-            loading, 
-            isAuthenticated: !!user,
-            hasUnreadNotifications,
-            checkNotificationStatus,
-            markNotificationsAsRead
-        }}>
-            {children}
-        </AuthContext.Provider>
-    );
+module.exports = { 
+    login, 
+    renewToken, 
+    forgotPassword, 
+    resetPassword 
 };
