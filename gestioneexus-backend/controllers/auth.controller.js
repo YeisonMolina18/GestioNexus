@@ -20,15 +20,16 @@ const login = async (req, res) => {
 
         const token = await generateJWT(user.id, user.full_name, user.role_name);
         await logAction(user.id, 'Inició sesión.');
+        
         res.json({
             ok: true,
             user: {
                 id: user.id,
-                fullName: user.full_name,
+                full_name: user.full_name,
                 username: user.username,
                 email: user.email,
                 role: user.role_name,
-                profilePictureUrl: user.profile_picture_url
+                profile_picture_url: user.profile_picture_url
             },
             token
         });
@@ -38,31 +39,49 @@ const login = async (req, res) => {
     }
 };
 
+// --- FUNCIÓN CORREGIDA ---
 const renewToken = async (req, res) => {
-    const { uid, name, role } = req;
-    const token = await generateJWT(uid, name, role);
+    const { uid } = req; // Obtenemos el ID del usuario del token ya validado
 
-    // --- CORRECCIÓN AQUÍ: Se añade 'u.profile_picture_url' a la consulta ---
-    const [rows] = await pool.query(
-        'SELECT u.id, u.full_name, u.username, u.email, u.profile_picture_url, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?', 
-        [uid]
-    );
-    const user = rows[0];
+    try {
+        // 1. Genera un nuevo token JWT
+        const token = await generateJWT(uid);
 
-    res.json({
-        ok: true,
-        token,
-        user: { 
-            id: uid, 
-            name: user.full_name,
-            fullName: user.full_name,
-            username: user.username,
-            email: user.email,
-            role: user.role_name,
-            profilePictureUrl: user.profile_picture_url // <-- Se añade a la respuesta
+        // 2. Busca la información MÁS ACTUALIZADA del usuario en la base de datos
+        const [rows] = await pool.query(
+            `SELECT u.id, u.full_name, u.username, u.email, u.profile_picture_url, r.name as role 
+             FROM users u 
+             JOIN roles r ON u.role_id = r.id 
+             WHERE u.id = ?`, 
+            [uid]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ ok: false, msg: 'Usuario no encontrado.' });
         }
-    });
+        
+        const user = rows[0];
+
+        // 3. Devuelve el nuevo token y los DATOS COMPLETOS y actualizados del usuario
+        res.json({
+            ok: true,
+            token,
+            user: {
+                id: user.id,
+                full_name: user.full_name,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                profile_picture_url: user.profile_picture_url
+            }
+        });
+
+    } catch (error) {
+        console.error("Error al renovar token:", error);
+        res.status(500).json({ ok: false, msg: 'Error al renovar el token' });
+    }
 };
+
 
 const forgotPassword = async (req, res) => {
     const { email } = req.body;
@@ -73,7 +92,7 @@ const forgotPassword = async (req, res) => {
             return res.json({ msg: 'Si existe una cuenta activa con este correo, se ha enviado un enlace de recuperación.' });
         }
         const token = crypto.randomBytes(20).toString('hex');
-        const expires = new Date(Date.now() + 15 * 60 * 1000);
+        const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
         await pool.query(
             'UPDATE users SET reset_password_token = ?, reset_password_expires = ? WHERE id = ?',
             [token, expires, user.id]
