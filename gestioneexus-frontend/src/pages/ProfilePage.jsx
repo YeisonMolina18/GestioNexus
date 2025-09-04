@@ -26,19 +26,17 @@ const ProfilePage = () => {
         try {
             Swal.fire({ title: 'Subiendo imagen...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
             
-            // 1. Llama a la API y guarda la respuesta
             const { data } = await api.post('/users/upload-photo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            // 2. Extrae la nueva URL de la respuesta
+            // Usamos el nombre de variable CORRECTO (camelCase)
             const newPhotoUrl = data.profilePictureUrl;
 
-            // 3. ACTUALIZA EL ESTADO del usuario con la nueva URL
-            //    manteniendo los datos antiguos y actualizando solo la foto.
+            // Actualizamos el estado usando el nombre de variable CORRECTO
             setUser(currentUser => ({
                 ...currentUser,
-                profile_picture_url: newPhotoUrl
+                profilePictureUrl: newPhotoUrl
             }));
 
             Swal.fire('¡Éxito!', data.msg, 'success');
@@ -57,11 +55,12 @@ const ProfilePage = () => {
                     <div className="flex-shrink-0 text-center">
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
                         
-                        {user.profile_picture_url ? (
-                            <img src={user.profile_picture_url} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
+                        {/* Usamos el nombre de variable CORRECTO (camelCase) para mostrar la imagen */}
+                        {user.profilePictureUrl ? (
+                            <img src={user.profilePictureUrl} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
                         ) : (
                             <div className="w-32 h-32 bg-[#5D1227] rounded-full flex items-center justify-center text-white text-5xl font-bold mx-auto shadow-md">
-                                {user.full_name ? user.full_name.charAt(0).toUpperCase() : '?'}
+                                {user.fullName ? user.fullName.charAt(0).toUpperCase() : '?'}
                             </div>
                         )}
                         <button onClick={handlePhotoClick} className="w-full mt-2 text-sm text-blue-600 hover:underline">Cambiar foto</button>
@@ -69,7 +68,7 @@ const ProfilePage = () => {
                     <div className="space-y-4 flex-grow w-full">
                         <div>
                             <label className="text-sm font-medium text-gray-500">Nombre Completo</label>
-                            <p className="text-lg text-gray-800 p-3 bg-gray-100 rounded-md">{user.full_name}</p>
+                            <p className="text-lg text-gray-800 p-3 bg-gray-100 rounded-md">{user.fullName}</p>
                         </div>
                         <div>
                             <label className="text-sm font-medium text-gray-500">Rol</label>
