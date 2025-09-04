@@ -1,6 +1,6 @@
-// src/context/AuthContext.jsx
+// gestioneexus-frontend/src/context/AuthContext.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
 import api from '../api/api';
 import Swal from 'sweetalert2';
 
@@ -9,47 +9,52 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+    const checkNotificationStatus = async () => {
+        try {
+            const { data } = await api.get('/notifications/status');
+            setHasUnreadNotifications(data.hasUnread);
+        } catch (error) {
+            console.error("Error checking notification status:", error);
+        }
+    };
+
+    const updateUserContext = (newUserData) => {
+        setUser(prevUser => ({ ...prevUser, ...newUserData }));
+    };
 
     useEffect(() => {
-        // Comprobar si hay un token en localStorage al cargar la app
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const decodedUser = jwtDecode(token);
-                setUser({
-                    id: decodedUser.uid,
-                    name: decodedUser.name,
-                    role: decodedUser.role
-                });
-            } catch (error) {
-                console.error("Token inválido:", error);
-                localStorage.removeItem('token');
+        const checkAuthStatus = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setLoading(false);
+                return;
             }
-        }
-        setLoading(false);
+            try {
+                const { data } = await api.get('/auth/renew');
+                localStorage.setItem('token', data.token);
+                setUser(data.user); // El backend ya envía el objeto de usuario correcto
+                checkNotificationStatus(); 
+            } catch (error) {
+                localStorage.removeItem('token');
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkAuthStatus();
     }, []);
 
     const login = async (email, password) => {
-        // --- AÑADE ESTA LÍNEA AQUÍ ---
-        console.log('FRONTEND: Intentando iniciar sesión con:', { email: email, password: password });
         try {
             const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('token', data.token);
-            const decodedUser = jwtDecode(data.token);
-            setUser({
-                id: decodedUser.uid,
-                name: data.user.fullName, // Usamos el nombre completo devuelto por el login
-                role: decodedUser.role
-            });
+            setUser(data.user); // El backend ya envía el objeto de usuario correcto
+            checkNotificationStatus();
             return true;
         } catch (error) {
-            console.error("Error en el login:", error.response.data);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error en el inicio de sesión',
-                text: error.response?.data?.msg || 'Credenciales incorrectas.',
-                confirmButtonColor: '#5D1227'
-            });
+            Swal.fire({ icon: 'error', title: 'Error en el inicio de sesión', text: error.response?.data?.msg || 'Credenciales incorrectas.' });
             return false;
         }
     };
@@ -59,8 +64,23 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const markNotificationsAsRead = () => {
+        setHasUnreadNotifications(false);
+        api.post('/notifications/mark-as-read').catch(err => console.error(err));
+    };
+
     return (
-        <AuthContext.Provider value={{ user, setUser, login, logout, loading, isAuthenticated: !!user }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            setUser: updateUserContext, 
+            login, 
+            logout, 
+            loading, 
+            isAuthenticated: !!user,
+            hasUnreadNotifications,
+            checkNotificationStatus,
+            markNotificationsAsRead
+        }}>
             {children}
         </AuthContext.Provider>
     );
