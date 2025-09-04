@@ -1,3 +1,5 @@
+// gestioneexus-frontend/src/pages/ProfilePage.jsx
+
 import React, { useContext, useState, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/api';
@@ -29,15 +31,12 @@ const ProfilePage = () => {
             const { data } = await api.post('/users/upload-photo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
-            // Usamos el nombre de variable CORRECTO (camelCase)
+            
+            // La respuesta del backend es 'profilePictureUrl' (camelCase), lo corregimos aquí.
             const newPhotoUrl = data.profilePictureUrl;
 
-            // Actualizamos el estado usando el nombre de variable CORRECTO
-            setUser(currentUser => ({
-                ...currentUser,
-                profilePictureUrl: newPhotoUrl
-            }));
+            // Actualizamos el estado con el nombre de campo correcto de la DB (snake_case)
+            setUser({ profile_picture_url: newPhotoUrl });
 
             Swal.fire('¡Éxito!', data.msg, 'success');
 
@@ -55,12 +54,11 @@ const ProfilePage = () => {
                     <div className="flex-shrink-0 text-center">
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
                         
-                        {/* Usamos el nombre de variable CORRECTO (camelCase) para mostrar la imagen */}
-                        {user.profilePictureUrl ? (
-                            <img src={user.profilePictureUrl} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
+                        {user.profile_picture_url ? (
+                            <img src={user.profile_picture_url} alt="Foto de perfil" className="w-32 h-32 rounded-full object-cover mx-auto shadow-md" />
                         ) : (
                             <div className="w-32 h-32 bg-[#5D1227] rounded-full flex items-center justify-center text-white text-5xl font-bold mx-auto shadow-md">
-                                {user.fullName ? user.fullName.charAt(0).toUpperCase() : '?'}
+                                {user.full_name ? user.full_name.charAt(0).toUpperCase() : '?'}
                             </div>
                         )}
                         <button onClick={handlePhotoClick} className="w-full mt-2 text-sm text-blue-600 hover:underline">Cambiar foto</button>
@@ -68,7 +66,7 @@ const ProfilePage = () => {
                     <div className="space-y-4 flex-grow w-full">
                         <div>
                             <label className="text-sm font-medium text-gray-500">Nombre Completo</label>
-                            <p className="text-lg text-gray-800 p-3 bg-gray-100 rounded-md">{user.fullName}</p>
+                            <p className="text-lg text-gray-800 p-3 bg-gray-100 rounded-md">{user.full_name}</p>
                         </div>
                         <div>
                             <label className="text-sm font-medium text-gray-500">Rol</label>

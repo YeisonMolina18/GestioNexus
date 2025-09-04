@@ -20,6 +20,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const updateUserContext = (newUserData) => {
+        setUser(prevUser => ({ ...prevUser, ...newUserData }));
+    };
+
     useEffect(() => {
         const checkAuthStatus = async () => {
             const token = localStorage.getItem('token');
@@ -30,13 +34,7 @@ export const AuthProvider = ({ children }) => {
             try {
                 const { data } = await api.get('/auth/renew');
                 localStorage.setItem('token', data.token);
-                // Estandarizamos el objeto de usuario
-                setUser({
-                    id: data.user.id,
-                    full_name: data.user.full_name, // Usamos full_name consistentemente
-                    role: data.user.role,
-                    profile_picture_url: data.user.profile_picture_url
-                });
+                setUser(data.user); // El backend ya envía el objeto de usuario correcto
                 checkNotificationStatus(); 
             } catch (error) {
                 localStorage.removeItem('token');
@@ -52,13 +50,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('token', data.token);
-            // Estandarizamos el objeto de usuario al iniciar sesión
-            setUser({
-                id: data.user.id,
-                full_name: data.user.full_name,
-                role: data.user.role,
-                profile_picture_url: data.user.profile_picture_url
-            });
+            setUser(data.user); // El backend ya envía el objeto de usuario correcto
             checkNotificationStatus();
             return true;
         } catch (error) {
@@ -72,10 +64,6 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
-    const updateUserContext = (newUserData) => {
-        setUser(prevUser => ({ ...prevUser, ...newUserData }));
-    };
-
     const markNotificationsAsRead = () => {
         setHasUnreadNotifications(false);
         api.post('/notifications/mark-as-read').catch(err => console.error(err));
@@ -84,7 +72,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{ 
             user, 
-            setUser: updateUserContext, // Exportamos la función correcta
+            setUser: updateUserContext, 
             login, 
             logout, 
             loading, 
