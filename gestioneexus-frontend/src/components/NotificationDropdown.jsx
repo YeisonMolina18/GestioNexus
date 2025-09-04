@@ -27,18 +27,15 @@ const NotificationDropdown = ({ isOpen, onClear }) => {
                 .catch(error => console.error("Error fetching notifications:", error))
                 .finally(() => setLoading(false));
         } else if (!isOpen) {
-            // Si el panel se cierra, pero no porque se limpió,
-            // lo preparamos para que la próxima vez que se abra, sí cargue.
-            // Esto no se ejecuta si hasBeenCleared es true.
-            if (!hasBeenCleared) {
-                // No hacemos nada aquí para mantener el estado
-            }
+            // No hacemos nada aquí para mantener el estado
         }
-    }, [isOpen]);
+    }, [isOpen, hasBeenCleared]); // Se añade hasBeenCleared a las dependencias
 
     const handleClearNotifications = () => {
+        // --- LÓGICA ORIGINAL RESTAURADA ---
+        api.post('/notifications/mark-as-read').catch(err => console.error("Could not contact server to mark notifications as read", err));
         setNotifications([]); // Limpiamos la lista visualmente
-        setHasBeenCleared(true); // Marcamos que ya se limpió
+        setHasBeenCleared(true); // Marcamos que ya se limpió para que no vuelva a cargar en esta sesión
         if (onClear) {
             onClear(); // Avisamos al Header que apague el punto rojo
         }
@@ -60,16 +57,16 @@ const NotificationDropdown = ({ isOpen, onClear }) => {
             <div className="p-4 font-bold border-b text-gray-700">Notificaciones</div>
             <div className="max-h-80 overflow-y-auto">
                 {loading ? <div className="p-4 text-center text-sm text-gray-500">Cargando...</div> :
-                 notifications.length > 0 ? (
-                     notifications.map(notif => (
-                         <div key={notif.id} className="p-4 border-b last:border-b-0 hover:bg-gray-50 flex items-start gap-3">
-                             <span className="mt-1 text-xl">{getIconForType(notif.type)}</span>
-                             <p className="text-sm text-gray-800">{notif.message}</p>
-                         </div>
-                     ))
-                 ) : (
-                     <div className="p-4 text-center text-sm text-gray-500">No hay notificaciones nuevas.</div>
-                 )}
+                    notifications.length > 0 ? (
+                        notifications.map(notif => (
+                            <div key={notif.id} className="p-4 border-b last:border-b-0 hover:bg-gray-50 flex items-start gap-3">
+                                <span className="mt-1 text-xl">{getIconForType(notif.type)}</span>
+                                <p className="text-sm text-gray-800">{notif.message}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-4 text-center text-sm text-gray-500">No hay notificaciones nuevas.</div>
+                    )}
             </div>
             {notifications.length > 0 && (
                 <div className="p-2 border-t">

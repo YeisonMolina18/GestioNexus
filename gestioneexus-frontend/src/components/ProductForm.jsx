@@ -21,13 +21,14 @@ const FormField = ({ label, name, type = 'text', value, onChange, required = fal
     </div>
 );
 
-
 const ProductForm = ({ onProductAdded, onProductUpdated, closeModal, productToEdit }) => {
     const [formData, setFormData] = useState({
         name: '', reference: '', category: '', sizes: '',
         brand: '', quantity: '', price: '', cost: ''
     });
     const [brands, setBrands] = useState([]);
+    const [showNewBrandInput, setShowNewBrandInput] = useState(false);
+    const [newBrand, setNewBrand] = useState('');
 
     const isEditing = !!productToEdit;
 
@@ -44,7 +45,7 @@ const ProductForm = ({ onProductAdded, onProductUpdated, closeModal, productToEd
     }, []);
 
     useEffect(() => {
-        if (isEditing) {
+        if (isEditing && productToEdit) {
             setFormData({
                 name: productToEdit.name,
                 reference: productToEdit.reference || '',
@@ -55,28 +56,56 @@ const ProductForm = ({ onProductAdded, onProductUpdated, closeModal, productToEd
                 price: productToEdit.price,
                 cost: productToEdit.cost || ''
             });
+            if (productToEdit.brand && !brands.includes(productToEdit.brand)) {
+                setShowNewBrandInput(true);
+                setNewBrand(productToEdit.brand);
+            }
         } else {
             setFormData({
                 name: '', reference: '', category: '', sizes: '',
                 brand: '', quantity: '', price: '', cost: ''
             });
+            setShowNewBrandInput(false);
+            setNewBrand('');
         }
-    }, [productToEdit, isEditing]);
+    }, [productToEdit, isEditing, brands]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prevState => ({ ...prevState, [name]: value }));
+
+        if (name === 'brand') {
+            if (value === 'add_new') {
+                setShowNewBrandInput(true);
+                setFormData(prevState => ({ ...prevState, brand: '' }));
+            } else {
+                setShowNewBrandInput(false);
+                setNewBrand('');
+                setFormData(prevState => ({ ...prevState, [name]: value }));
+            }
+        } else {
+            setFormData(prevState => ({ ...prevState, [name]: value }));
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        const finalBrand = showNewBrandInput ? newBrand.trim() : formData.brand;
+
+        if (!finalBrand) {
+             Swal.fire('Error', 'Debes seleccionar o agregar una marca.', 'error');
+             return;
+        }
+
+        const submissionData = { ...formData, brand: finalBrand };
+
         try {
             if (isEditing) {
-                const { data: updatedProduct } = await api.put(`/products/${productToEdit.id}`, formData);
+                const { data: updatedProduct } = await api.put(`/products/${productToEdit.id}`, submissionData);
                 Swal.fire('¡Éxito!', 'Producto actualizado correctamente.', 'success');
                 onProductUpdated(updatedProduct);
             } else {
-                const { data: newProduct } = await api.post('/products', formData);
+                const { data: newProduct } = await api.post('/products', submissionData);
                 Swal.fire('¡Éxito!', 'Producto agregado correctamente.', 'success');
                 onProductAdded(newProduct);
             }
@@ -94,21 +123,34 @@ const ProductForm = ({ onProductAdded, onProductUpdated, closeModal, productToEd
                 
                 <div>
                     <label htmlFor="brand" className="block mb-1 text-sm font-medium text-gray-700">Marca</label>
-                    <input
+                    <select
                         id="brand"
-                        type="text"
                         name="brand"
-                        value={formData.brand}
+                        value={showNewBrandInput ? 'add_new' : formData.brand}
                         onChange={handleChange}
+                        required={!showNewBrandInput}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5D1227]"
-                        list="brands-datalist"
-                    />
-                    <datalist id="brands-datalist">
-                        {brands.map((brand, index) => (
-                            <option key={index} value={brand} />
+                    >
+                        <option value="">Seleccione una marca</option>
+                        {brands.map((brandName, index) => (
+                            <option key={index} value={brandName}>{brandName}</option>
                         ))}
-                    </datalist>
+                        <option value="add_new" className="font-bold text-blue-600">-- Agregar nueva marca... --</option>
+                    </select>
                 </div>
+                
+                {showNewBrandInput && (
+                    <div className="md:col-span-2">
+                        <FormField 
+                            label="Nombre de la Nueva Marca" 
+                            name="newBrand" 
+                            value={newBrand} 
+                            onChange={(e) => setNewBrand(e.target.value)} 
+                            required 
+                            placeholder="Escribe el nombre de la nueva marca"
+                        />
+                    </div>
+                )}
 
                 <FormField label="Referencia" name="reference" value={formData.reference} onChange={handleChange} />
                 <div>
@@ -121,7 +163,6 @@ const ProductForm = ({ onProductAdded, onProductUpdated, closeModal, productToEd
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5D1227]"
                     >
                         <option value="">Seleccione una categoría</option>
-                        {/* --- CORRECCIÓN AQUÍ: Se restauran las opciones --- */}
                         <option value="Hombre">Hombre</option>
                         <option value="Mujer">Mujer</option>
                         <option value="Niño">Niño</option>

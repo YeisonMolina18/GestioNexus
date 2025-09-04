@@ -75,7 +75,7 @@ const ProductsPage = () => {
             if (result.isConfirmed) {
                 try {
                     await api.delete(`/products/${productId}`);
-                    Swal.fire('¡Desactivado!', 'El producto ha sido desactivado.', 'success');
+                    Swal.fire('¡Eliminado!', 'El producto ha sido eliminado.', 'success');
                     fetchProducts(currentPage);
                 } catch (error) {
                     Swal.fire('Error', 'No se pudo desactivar el producto.', 'error');

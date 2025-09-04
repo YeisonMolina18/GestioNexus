@@ -5,7 +5,6 @@ import Modal from '../components/Modal';
 import FinancialEntryForm from '../components/FinancialEntryForm';
 import Pagination from '../components/Pagination';
 import { jsPDF } from 'jspdf';
-// --- CORRECCIÓN AQUÍ: Volvemos a la importación que funciona ---
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 
@@ -108,7 +107,6 @@ const ReportsPage = () => {
                 formatCurrency(entry.expense)
             ]);
 
-            // --- CORRECCIÓN AQUÍ: Usamos autoTable(doc, ...) en lugar de doc.autoTable(...) ---
             autoTable(doc, {
                 head: [tableColumn],
                 body: tableRows,
@@ -178,7 +176,15 @@ const ReportsPage = () => {
     };
 
     const formatCurrency = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value ?? 0);
-    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('es-CO');
+
+    // --- FUNCIÓN CORREGIDA ---
+    const formatDate = (dateString) => {
+        // Esta función previene la conversión de zona horaria al tomar solo la parte de la fecha (YYYY-MM-DD)
+        const [datePart] = dateString.split('T');
+        const [year, month, day] = datePart.split('-');
+        // Se formatea a DD/MM/YYYY para la visualización en la tabla
+        return `${day}/${month}/${year}`;
+    };
 
     return (
         <div className="space-y-6">

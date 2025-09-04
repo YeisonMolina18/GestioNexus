@@ -3,8 +3,15 @@ import api from '../api/api';
 import Swal from 'sweetalert2';
 
 const FinancialEntryForm = ({ onEntryAdded, closeModal }) => {
-    // Obtenemos la fecha de hoy en formato YYYY-MM-DD para el atributo 'max' del input
-    const today = new Date().toISOString().slice(0, 10);
+    // --- INICIO DE LA CORRECCIÓN DEFINITIVA ---
+    // Se construye la fecha de hoy basándose en la zona horaria local del navegador,
+    // evitando la conversión a UTC de .toISOString() que causaba el error.
+    const todayDate = new Date();
+    const year = todayDate.getFullYear();
+    const month = String(todayDate.getMonth() + 1).padStart(2, '0'); // Se añade +1 porque los meses van de 0-11
+    const day = String(todayDate.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+    // --- FIN DE LA CORRECCIÓN ---
 
     const [formData, setFormData] = useState({
         entry_date: today, // Fecha de hoy por defecto
@@ -43,7 +50,6 @@ const FinancialEntryForm = ({ onEntryAdded, closeModal }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label htmlFor="entry_date" className="block mb-1 text-sm font-medium text-gray-700">Fecha</label>
-                    {/* --- CORRECCIÓN AQUÍ --- */}
                     <input id="entry_date" name="entry_date" type="date" value={formData.entry_date} onChange={handleChange} required max={today} className="w-full p-2 border border-gray-300 rounded-md" />
                 </div>
                 <div className="md:col-span-2">

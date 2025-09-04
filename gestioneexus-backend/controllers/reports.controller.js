@@ -1,10 +1,11 @@
+// Se importa la función para registrar en la auditoría
+const { logAction } = require('../helpers/audit.helper');
 const pool = require('../db/database');
 const ExcelJS = require('exceljs');
 const { jsPDF } = require("jspdf");
 const autoTable = require('jspdf-autotable');
 
 const getFinancialLedger = async (req, res) => {
-    // Aceptamos parámetros de paginación y filtros
     const { page = 1, limit = 15, startDate, endDate, search = '' } = req.query;
     const offset = (page - 1) * limit;
     
@@ -25,13 +26,15 @@ const getFinancialLedger = async (req, res) => {
     }
     
     try {
-        // Consulta para obtener los datos de la página actual
-        const [entries] = await pool.query(`SELECT * ${baseQuery} ORDER BY entry_date DESC LIMIT ? OFFSET ?`, [...params, parseInt(limit), parseInt(offset)]);
-        
-        // Consulta para obtener el conteo total de registros que coinciden con los filtros
-        const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total ${baseQuery}`, params);
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se añade "id DESC" como segundo criterio de ordenamiento para desempatar registros con la misma fecha.
+        const [entries] = await pool.query(
+            `SELECT * ${baseQuery} ORDER BY entry_date DESC, id DESC LIMIT ? OFFSET ?`, 
+            [...params, parseInt(limit), parseInt(offset)]
+        );
+        // --- FIN DE LA CORRECCIÓN ---
 
-        // Nueva lógica para calcular los totales para el período filtrado
+        const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total ${baseQuery}`, params);
         const [[summary]] = await pool.query(`
             SELECT
                 SUM(income) as totalIncome,
@@ -57,11 +60,28 @@ const getFinancialLedger = async (req, res) => {
 
 const createFinancialEntry = async (req, res) => {
     const { entry_date, concept, income, expense } = req.body;
+    // CORRECCIÓN FINAL: Se usa req.uid, que es lo que provee tu middleware 'validateJWT'
+    const userId = req.uid; 
+
     try {
         await pool.query(
             'INSERT INTO financial_ledger (entry_date, concept, income, expense) VALUES (?, ?, ?, ?)',
             [entry_date, concept || null, income || 0, expense || 0]
         );
+
+        // Lógica de Auditoría
+        let actionDetails = '';
+
+        if (income > 0) {
+            actionDetails = `Se registró un INGRESO por "${concept}" por un monto de ${income}.`;
+        } else if (expense > 0) {
+            actionDetails = `Se registró un EGRESO por "${concept}" por un monto de ${expense}.`;
+        }
+
+        if (actionDetails) {
+            await logAction(userId, actionDetails);
+        }
+
         res.status(201).json({ msg: 'Entrada contable creada' });
     } catch (error) {
         console.error("Error al registrar movimiento:", error);
@@ -72,8 +92,10 @@ const createFinancialEntry = async (req, res) => {
 
 const exportLedgerToExcel = async (req, res) => {
     try {
-        // Para exportar, traemos todos los datos, sin paginación
-        const [ledgerData] = await pool.query('SELECT entry_date, concept, income, expense FROM financial_ledger ORDER BY entry_date ASC');
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se aplica el mismo ordenamiento (entry_date DESC, id DESC) para que el reporte sea consistente.
+        const [ledgerData] = await pool.query('SELECT * FROM financial_ledger ORDER BY entry_date DESC, id DESC');
+        // --- FIN DE LA CORRECCIÓN ---
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Reporte Financiero');
