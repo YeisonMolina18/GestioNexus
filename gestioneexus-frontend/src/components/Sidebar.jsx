@@ -18,7 +18,6 @@ const MetricsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
     const handleLogout = () => {
         Swal.fire({
@@ -34,6 +33,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
     const getLinkClass = ({ isActive }) => `${linkStyles} ${isActive ? activeLinkStyles : inactiveLinkStyles}`;
 
+    // Añadimos una comprobación para no renderizar nada si el usuario no ha cargado
+    if (!user) {
+        return null;
+    }
+
     return (
         <div className={`fixed inset-y-0 left-0 bg-[#5D1227] text-white flex flex-col h-full shadow-lg z-30 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} w-64`}>
             <div className="p-6 text-center flex justify-between items-center lg:justify-center">
@@ -46,19 +50,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 </button>
             </div>
             
+            {/* --- BLOQUE DE CÓDIGO CORREGIDO --- */}
             <div className="px-6 py-4 flex items-center justify-start">
                 <div className="w-10 h-10 rounded-full flex-shrink-0 mr-4 bg-yellow-400 flex items-center justify-center overflow-hidden">
-                    {user?.profilePictureUrl ? (
-                        <img src={`${backendUrl}${user.profilePictureUrl}`} alt="Avatar" className="w-full h-full object-cover" />
+                    {user.profile_picture_url ? (
+                        <img src={user.profile_picture_url} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
                         <span className="text-xl font-bold text-[#5D1227]">
-                            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                            {user.full_name ? user.full_name.charAt(0).toUpperCase() : '?'}
                         </span>
                     )}
                 </div>
                 <div className="text-left">
                     <p className="text-sm">BIENVENIDO</p>
-                    <p className="font-semibold text-lg">{user?.name || 'Usuario'}</p>
+                    <p className="font-semibold text-lg">{user.full_name || 'Usuario'}</p>
                 </div>
             </div>
 
@@ -71,7 +76,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 <NavLink to="/products" className={getLinkClass}><ProductosIcon /> Productos</NavLink>
 
                 {/* Grupo de Admin */}
-                {user?.role === 'admin' && (
+                {user.role === 'admin' && (
                     <>
                         <hr className="border-white border-opacity-20 my-4 mx-4" />
                         <h3 className="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Admin</h3>
