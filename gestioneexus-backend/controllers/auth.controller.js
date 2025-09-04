@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const pool = require('../db/database');
 const { generateJWT } = require('../helpers/jwt');
 const { sendPasswordResetEmail } = require('../helpers/email.helper');
-const { logAction } = require('../helpers/audit.helper'); // <-- 1. IMPORTACIÓN AÑADIDA
+const { generateJWT } = require('../helpers/jwt.helper');
 
 const login = async (req, res) => {
     // Ya no necesitamos este console.log, lo podemos quitar para limpiar la terminal
