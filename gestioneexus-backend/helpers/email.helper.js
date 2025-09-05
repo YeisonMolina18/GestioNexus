@@ -2,6 +2,8 @@ const nodemailer = require('nodemailer');
 
 const sendPasswordResetEmail = async (userEmail, token) => {
     try {
+        // Para producción, deberías usar un servicio de correo real.
+        // Por ahora, Ethereal nos sirve para confirmar que la lógica funciona.
         const testAccount = await nodemailer.createTestAccount();
 
         const transporter = nodemailer.createTransport({
@@ -14,7 +16,9 @@ const sendPasswordResetEmail = async (userEmail, token) => {
             },
         });
 
-        const resetLink = `http://localhost:5173/reset-password/${token}`;
+        // --- ESTA ES LA LÍNEA CORREGIDA ---
+        // Ahora usa la URL de tu frontend en producción desde las variables de entorno.
+        const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
         const mailOptions = {
             from: '"GestioNexus" <soporte@gestioneexus.com>',
